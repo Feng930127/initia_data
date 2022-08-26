@@ -164,10 +164,10 @@ int main(int argc,char **argv)
   PetscErrorCode ierr;
   PatternCtx     user;
   TS             ts;
-  Vec            x, err, err1;
+  Vec            x, err, err1,y;
   DM             da;
   DMDALocalInfo  info;
-  PetscReal      errnorm,errnorm1,tf,hx,hy;
+  PetscReal      errnorm,errnorm1,tf,hx,hy, errnorm2 = 0.0;
   Field          **aY, **aG;
   PetscInt       i, j;
 
@@ -195,7 +195,7 @@ int main(int argc,char **argv)
   ierr = DMDACreate2d(PETSC_COMM_WORLD,
                DM_BOUNDARY_NONE, DM_BOUNDARY_NONE,
                DMDA_STENCIL_STAR,  // for 5-point stencil
-               41, 41, PETSC_DECIDE,PETSC_DECIDE,
+               11, 11, PETSC_DECIDE,PETSC_DECIDE,
                2, 1,              // degrees of freedom, stencil width
                NULL, NULL, &da); CHKERRQ(ierr);
   ierr = DMSetFromOptions(da); CHKERRQ(ierr);
@@ -219,9 +219,9 @@ int main(int argc,char **argv)
   //ierr = DMDATSSetRHSJacobianLocal(da,
     //       (DMDATSRHSJacobianLocal)FormRHSJacobianLocal,&user); CHKERRQ(ierr);
 
-  ierr = TSSetType(ts,TSRK); CHKERRQ(ierr);
+  ierr = TSSetType(ts,TSBDF); CHKERRQ(ierr);
   ierr = TSSetTime(ts,0.0); CHKERRQ(ierr);
-  ierr = TSSetMaxTime(ts,10.0); CHKERRQ(ierr);
+  ierr = TSSetMaxTime(ts,1000000.0); CHKERRQ(ierr);
   ierr = TSSetTimeStep(ts,0.00002); CHKERRQ(ierr);
   ierr = TSSetExactFinalTime(ts,TS_EXACTFINALTIME_MATCHSTEP); CHKERRQ(ierr);
   ierr = TSSetFromOptions(ts);CHKERRQ(ierr);
@@ -230,26 +230,28 @@ int main(int argc,char **argv)
   ierr = DMCreateGlobalVector(da,&x); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&err); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&err1); CHKERRQ(ierr);
+  ierr = VecDuplicate(x,&y); CHKERRQ(ierr);
   ierr = InitialState(da,x,&user); CHKERRQ(ierr);
   ierr = TSSolve(ts,x); CHKERRQ(ierr);
   ierr = TSGetMaxTime(ts,&tf); CHKERRQ(ierr);
+  
+  ierr = TSComputeRHSFunction(ts, tf, x, y); CHKERRQ(ierr);
  
+
   ierr = DMDAVecGetArray(da,x,&aY); CHKERRQ(ierr);
   ierr = DMDAVecGetArray(da,x,&aG); CHKERRQ(ierr);
-  //ierr = FormRHSFunctionLocal(&info, 0.0, aY, aG, &user); CHKERRQ(ierr);
+  //ierr = FormRHSFunctionLocal(&info, tf, aY, aG, &user); CHKERRQ(ierr);
   hx = (user.R - user.L) / (PetscReal)(info.mx - 1);
-  hy = (user.D - user.U) / (PetscReal)(info.my - 1); 
-  for (j = info.ys; j < info.ys+info.ym; j++) {
-      for (i = info.xs; i < info.xs+info.xm; i++) {
-          if (PetscAbsReal(aY[j][i].u) > 2.0){
-	      PetscPrintf(PETSC_COMM_WORLD, "L1(num) = %g,i=%d,j=%d\n", aY[j][i].u,i,j);
-	  }
-      }
-  }
-  
-  ierr = VecNorm(x, NORM_INFINITY, &errnorm); CHKERRQ(ierr);
-  ierr = VecNorm(x, NORM_1, &errnorm1); CHKERRQ(ierr);
-  PetscPrintf(PETSC_COMM_WORLD, "Linfinity(x) = %g, L1(x) = %g\n", 
+  hy = (user.U - user.D) / (PetscReal)(info.my - 1); 
+  //for (j = info.ys; j < info.ys+info.ym; j++) {
+  //    for (i = info.xs; i < info.xs+info.xm; i++) {
+  //        errnorm2 = errnorm2 + PetscAbsReal(aY[j][i].u);
+  //    }
+ // }
+  //PetscPrintf(PETSC_COMM_WORLD, "L1(num) = %g", errnorm2);   
+  ierr = VecNorm(y, NORM_INFINITY, &errnorm); CHKERRQ(ierr);
+  ierr = VecNorm(y, NORM_1, &errnorm1); CHKERRQ(ierr);
+  PetscPrintf(PETSC_COMM_WORLD, "Linfinity(y) = %g, L1(y) = %g\n", 
 				errnorm, errnorm1*hx*hy);
   
   VecDestroy(&x);  TSDestroy(&ts);  DMDestroy(&da);
@@ -454,11 +456,11 @@ PetscErrorCode FormRHSFunctionLocal(DMDALocalInfo *info,
                                 + 0.0*barrier(x, y);
               aG[j][i].v = (vxx + vyy + 1.0*(v1 + v2 + v3))*(1.5 - barrier(x,y))
                                 + 0.0*barrier(x,y);
-	      num += PetscAbsReal(aG[j][i].v);
+	      num += PetscAbsReal(aG[j][i].u);
 	  }
       }
   }
-  ierr = PetscPrintf(PETSC_COMM_WORLD, "L1 = %g\n", num*hx*hy); CHKERRQ(ierr);
+  //ierr = PetscPrintf(PETSC_COMM_WORLD, "L1 = %g\n", num*hx*hy); CHKERRQ(ierr);
   return 0.;
 }
 
