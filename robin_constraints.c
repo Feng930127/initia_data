@@ -186,7 +186,7 @@ int main(int argc,char **argv) {
   ierr = DMDACreate2d(PETSC_COMM_WORLD,
                DM_BOUNDARY_NONE, DM_BOUNDARY_NONE,
                DMDA_STENCIL_STAR,  // for 5-point stencil
-               41, 41, PETSC_DECIDE,PETSC_DECIDE,
+               5, 5, PETSC_DECIDE,PETSC_DECIDE,
                2, 1,              // degrees of freedom, stencil width
                NULL, NULL, &da); CHKERRQ(ierr);
   ierr = DMSetFromOptions(da); CHKERRQ(ierr);
@@ -420,7 +420,7 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,				Field **aG,
               u3 = 1.0/16.0*PetscPowReal(NN(x,y), -2.0)*x*x
                      * (PetscPowReal(1.0/(2.0*hx)*(aY[j][i+1].v - vxl),2.0)
                          + PetscPowReal(1.0/(2.0*hy)*(aY[j+1][i].v - aY[j-1][i].v),2.0))
-                     * PetscPowReal(aY[j][i].u,-7.0);
+                     * PetscPowReal(aY[j][i].u,5.0);
 
               vxx = (vxl - 2.0 * aY[j][i].v + vxr)/(hx*hx);
               vyy = (vyl - 2.0 * aY[j][i].v + vyr)/(hy*hy);
