@@ -19,6 +19,19 @@ We define some functions here, rtuta is the quasi-isotropic radius for
 the Kerr spacetime, similarily isotropic radius for the Scharzschild 
 spacetime. 
 */
+static PetscReal barrier(PetscReal x, PetscReal y) {
+  PetscReal barrier, a, r1, r0;
+
+  r0 = PetscSqrtReal(1.0-0.01)/2;
+  a = PetscPowReal(10.0,20.0);
+  r1 = PetscSqrtReal((x - r0)*(x - r0) + (y-3.1416/2)*(y-3.1416/2)) - 1.5;
+  barrier = - 1.5/PETSC_PI*PetscAtanReal(r1*a) + 1.5/2;
+ 
+  if(PetscAbsReal(barrier) < 0.1) return(0.);
+  else return(barrier);
+}
+
+
 static PetscReal Delta_fun(PetscReal x, PetscReal y,
                            PetscReal a, PetscReal M) {
   PetscReal rtuta, Delta;
@@ -37,11 +50,28 @@ static PetscReal CC_fun(PetscReal x, PetscReal y,
   if(PetscAbsReal(CC) < EPSILON) return(0.);
   else return(CC);
 }
+static PetscReal NN(PetscReal x, PetscReal y,
+                                PetscReal a, PetscReal M){
+  PetscReal rtuta,siny2,
+            cosy2,Delta,Sigma,AA;
+
+  rtuta = x + M + (M*M-a*a)/(4.0*x);
+  siny2 = PetscPowReal(PetscSinReal(y),2.0);
+  cosy2 = PetscPowReal(PetscCosReal(y),2.0);
+  Delta = Delta_fun(x,y,a,M);
+  Sigma = rtuta*rtuta + a*a*cosy2;
+  AA    = PetscPowReal(a*a+rtuta*rtuta,2.0) - a*a*Delta*siny2;
+  
+  return PetscSqrtReal((4.0*a*a*M*M*rtuta*rtuta*siny2*siny2)/(Sigma*Sigma)
+                + (AA*siny2*(Delta - a*a*siny2))/(Sigma*Sigma))
+                /PetscSqrtReal((AA*siny2)/Sigma);
+}
+
 
 static PetscReal psi_exact(PetscReal x, PetscReal y,
                                 PetscReal a, PetscReal M){
   PetscReal rtuta, siny, cosy, siny2,
-            cosy2, Delta, Sigma, AA, BB, CC;
+            cosy2, Delta, Sigma, AA;
 
   rtuta = x + M + (M*M - a*a)/(4.0*x);
   siny  = PetscSinReal(y);
@@ -51,12 +81,11 @@ static PetscReal psi_exact(PetscReal x, PetscReal y,
   Delta = Delta_fun(x,y,a,M);
   Sigma = rtuta*rtuta + a*a*cosy2;
   AA    = PetscPowReal(a*a+rtuta*rtuta,2.0) - a*a*Delta*siny2;
-  CC    = CC_fun(x,y,a,M);
-  BB    = 4.0*CC*rtuta*(a*a + rtuta*rtuta)
-                - a*a*(-2.0*M*CC + 2.0*CC*rtuta)*siny2;
+  //CC    = CC_fun(x,y,a,M);
+  //BB    = 4.0*CC*rtuta*(a*a + rtuta*rtuta)
+                //- a*a*(-2.0*M*CC + 2.0*CC*rtuta)*siny2;
 
-  return PetscPowReal(AA/(x*x*Sigma),1.0/4.0)
-                + 0.0*(siny+cosy+cosy2+Delta+Sigma+CC+BB);
+  return PetscPowReal(AA/(x*x*Sigma),1.0/4.0);
 }
 
 static PetscReal Psi_exact(PetscReal x, PetscReal y,
@@ -72,6 +101,25 @@ static PetscReal Psi_exact(PetscReal x, PetscReal y,
 
   return 2.0*M*a*(cosy2*cosy-3.0*cosy)-2.0*M*a*a*a*cosy*siny2*siny2/Sigma;
 }
+
+static PetscReal omega_exact(PetscReal x, PetscReal y,
+                                PetscReal a, PetscReal M){
+  PetscReal rtuta,siny2,Delta,AA;
+
+  rtuta = x + M + (M*M-a*a)/(4.0*x);
+  //siny  = PetscSinReal(y);
+  //cosy  = PetscCosReal(y);
+  siny2 = PetscPowReal(PetscSinReal(y),2.0);
+  //cosy2 = PetscPowReal(PetscCosReal(y),2.0);
+  Delta = Delta_fun(x,y,a,M);
+  //Sigma = rtuta*rtuta + a*a*cosy2;
+  AA    = PetscPowReal(a*a+rtuta*rtuta,2.0) - a*a*Delta*siny2;
+  //CC    = CC_fun(x,y,a,M);
+  //BB    = 4.0*CC*rtuta*(a*a + rtuta*rtuta)
+                //- a*a*(-2.0*M*CC + 2.0*CC*rtuta)*siny2;
+  return -2.0*a*M*rtuta/AA;
+}
+
 
 static PetscReal dNdr(PetscReal x, PetscReal y,
                                 PetscReal a, PetscReal M){
@@ -166,9 +214,9 @@ int main(int argc,char **argv) {
   DM            da;
   SNES          snes;
   AppCtx        user;
-  Vec           x, Yexact, err, err1;
+  Vec           x, Yexact, err, err1, y;
   Mat           M1;
-  PetscReal     hr, htheta, errnorm, errnorm1;
+  PetscReal     hr, htheta, errnorm, errnorm1, errnorm2;
   DMDALocalInfo info;
 
   ierr = PetscInitialize(&argc,&argv,NULL,help); if (ierr) return ierr;
@@ -218,6 +266,7 @@ int main(int argc,char **argv) {
   ierr = VecDuplicate(x,&Yexact); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&err); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&err1); CHKERRQ(ierr);
+  ierr = VecDuplicate(x,&y); CHKERRQ(ierr);
   ierr = InitialState(da,x,&user); CHKERRQ(ierr);
   ierr = ExactSolution(da,Yexact,&user); CHKERRQ(ierr);
   ierr = DMCreateMatrix(da,&M1); CHKERRQ(ierr);
@@ -229,10 +278,11 @@ int main(int argc,char **argv) {
   ierr = DMDASNESSetJacobianLocal(da,
              (DMDASNESJacobian)FormJacobianLocal,&user); CHKERRQ(ierr);
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
-  ierr = SNESComputeJacobianDefault(snes, x, M1, M1, &user); CHKERRQ(ierr);
+ // ierr = SNESComputeJacobianDefault(snes, x, M1, M1, &user); CHKERRQ(ierr);
   //ierr = MatView(M1, PETSC_VIEWER_STDOUT_WORLD); CHKERRQ(ierr);
   ierr = SNESSolve(snes,NULL,x); CHKERRQ(ierr);
-  
+  ierr = SNESComputeFunction(snes, x, y); CHKERRQ(ierr);
+ 
   hr = (user.R - user.L) / (PetscReal)(info.mx - 1);
   htheta = (user.D - user.U) / (PetscReal)(info.my - 1);
   ierr = VecWAXPY(err,-1.0,x,Yexact); CHKERRQ(ierr);
@@ -241,8 +291,10 @@ int main(int argc,char **argv) {
   ierr = VecNorm(err, NORM_INFINITY, &errnorm); CHKERRQ(ierr);
   ierr = VecNorm(err1, NORM_1, &errnorm1); CHKERRQ(ierr);
 
+  ierr = VecNorm(y, NORM_INFINITY, &errnorm2); CHKERRQ(ierr);
+
   ierr = PetscPrintf(PETSC_COMM_WORLD,
-           "L-Inf(err)=%g, L1(err)=%g\n", errnorm,errnorm1); CHKERRQ(ierr);
+           "L-Inf(err)=%g, L1(err)=%g, L-Inf(res)=%g\n", errnorm,errnorm1,errnorm2); CHKERRQ(ierr);
 
   VecDestroy(&x);    VecDestroy(&Yexact); 
   VecDestroy(&err);   VecDestroy(&err1);
@@ -270,13 +322,13 @@ PetscErrorCode InitialState(DM da, Vec Y, AppCtx* user) {
       y = j * htheta + user->U;
       for (i = info.xs; i < info.xs+info.xm; i++) {
           x = i * hr + user->L;
-          if (i==0||i==info.mx-1||j==0||j==info.my-1) {
-                aY[j][i].u = 1.0 + 0.0*psi_exact(x, y, a, M);
-                aY[j][i].v = 1.0;//Psi_exact(x, y, a, M);
+          if (i==info.mx-1||j==0||j==info.my-1) {
+                aY[j][i].u = psi_exact(x, y, a, M);
+                aY[j][i].v = omega_exact(x, y, a, M);
              }
              else{
-                aY[j][i].u = 1.0;//psi_exact(x, y, a, M);
-                aY[j][i].v = 1.0;//Psi_exact(x, y, a, M);
+                aY[j][i].u = 1.0+0.1*barrier(x,y);//psi_exact(x, y, a, M);
+                aY[j][i].v = -0.0001*barrier(x,y);//omega_exact(x, y, a, M);
              }
       }
   }
@@ -307,7 +359,7 @@ PetscErrorCode ExactSolution(DM da, Vec Y, AppCtx* user) {
       for (i = info.xs; i < info.xs+info.xm; i++) {
           x = hr * i + user->L;
           aY[j][i].u = psi_exact(x, y, a, M);
-          aY[j][i].v = Psi_exact(x, y, a, M);
+          aY[j][i].v = omega_exact(x, y, a, M);
       }
   }
   ierr = DMDAVecRestoreArray(da,Y,&aY); CHKERRQ(ierr);
@@ -319,52 +371,66 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
 				Field **aG, AppCtx *user) {
   PetscInt   i, j, mx = info->mx, my = info->my;
   PetscReal  uxx, uyy, u1, u2, u3, vxx, vyy, v1, v2, v3, x, y,
-	     L = user->L, R = user->R, U = user->U, D = user->D;
-  PetscReal  hr = (user->R - user->L) / (PetscReal)(mx -1),
-             htheta = (user->D - user->U) / (PetscReal)(my -1),
+	         R = user->R, U = user->U, D = user->D;
+  PetscReal  hr = (user->R - user->L) / (PetscReal)(mx - 1),
+             htheta = (user->D - user->U) / (PetscReal)(my - 1),
              a = user->a, M = user->M, vil, vir, vjl, vjr,
-             uil, uir, ujl, ujr;
+             uil, uir, ujl, ujr, eta = PetscSqrtReal(M*M - a*a)/2.0,
+             siny;
 
   for (j = info->ys; j < info->ys + info->ym; j++) {
       y = htheta * j + user->U;
+      siny = PetscSinReal(y);
       for (i = info->xs; i < info->xs + info->xm; i++) {
           x = hr * i + user->L;
-          if (i==0||i==mx-1||j==0||j==my-1) {
+          if (i==mx-1 || j==0 || j==my-1) {
               aG[j][i].u = (aY[j][i].u - psi_exact(x, y, a, M));
-              aG[j][i].v = (aY[j][i].v - Psi_exact(x, y, a, M));
+              aG[j][i].v = (aY[j][i].v - omega_exact(x, y, a, M));
+          }
+          else if(i==0){
+              aG[j][i].u = (4.0*aY[j][i+1].u - aY[j][i+2].u)/2.0/hr 
+                                - (3.0/2.0/hr - 1.0/2.0/eta)*aY[j][i].u;
+              aG[j][i].v = aY[j][i].v-omega_exact(x,y,a,M);//aY[j][i].v - omega_exact(x,y,a,M);
           }
           else {
-              uil = (i==1) ? psi_exact(L, y, a, M) : aY[j][i-1].u;
+              uil = (i==0) ? (aY[j][i+1].u + aY[j][i].u*hr/eta) : aY[j][i-1].u;
               uir = (i==mx-2) ? psi_exact(R, y, a, M) : aY[j][i+1].u;
               ujl = (j==1) ? psi_exact(x, U, a, M) : aY[j-1][i].u;
               ujr = (j==my-2) ? psi_exact(x, D, a, M) : aY[j+1][i].u;
-              vil = (i==1) ? Psi_exact(L, y, a, M) : aY[j][i-1].v;
-              vir = (i==mx-2) ? Psi_exact(R, y, a, M) : aY[j][i+1].v;
-              vjl = (j==1) ? Psi_exact(x, U, a, M) : aY[j-1][i].v;
-              vjr = (j==my-2) ? Psi_exact(x, D, a, M) : aY[j+1][i].v;
+              vil = (i==0) ? aY[j][i+1].v : aY[j][i-1].v;
+              vir = (i==mx-2) ? omega_exact(R, y, a, M) : aY[j][i+1].v;
+              vjl = (j==1) ? omega_exact(x, U, a, M) : aY[j-1][i].v;
+              vjr = (j==my-2) ? omega_exact(x, D, a, M) : aY[j+1][i].v;
 
-	      uxx = (uil - 2.0 * aY[j][i].u + uir)/(hr)*htheta;
+	          uxx = (uil - 2.0 * aY[j][i].u + uir)/(hr)*htheta;
               uyy = (ujl - 2.0 * aY[j][i].u + ujr)/(x*x*htheta)*hr;
               u1 = (uir - uil) / (x)*htheta
                         + (ujr - ujl)/(x*x*2.0*PetscTanReal(y))*hr;
               u2 = 1.0/4.0*qrtheta(x,y,a,M)*aY[j][i].u*hr*htheta;
-              u3 = 1.0/16.0*PetscPowReal(x*PetscSinReal(y),-4.0)
-                   * (PetscPowReal(1.0/2.0*(vir-vil),2.0)*htheta/hr
-		 	+ 1.0/(x*x)*PetscPowReal(1.0/(2.0)*(vjr-vjl),2.0)*hr/htheta)
-		   *PetscPowReal(aY[j][i].u,-7.0);
+              //u3 = 1.0/16.0*PetscPowReal(x*PetscSinReal(y), -4.0)
+              //     * (PetscPowReal(1.0/2.0*(vir-vil), 2.0)*htheta/hr
+		 	  //          + 1.0/(x*x)*PetscPowReal(1.0/(2.0)*(vjr-vjl), 2.0)*hr/htheta)
+		      //     * PetscPowReal(aY[j][i].u, -7.0);
+              u3 = 1.0/16.0*PetscPowReal(NN(x,y,a,M), -2.0)*x*x*siny*siny
+			         * (PetscPowReal(1.0/(2.0)*(vir - vil),2.0)*htheta/hr
+			              + 1.0/(x*x)*PetscPowReal(1.0/(2.0)*(vjr - vjl),2.0)*hr/htheta)
+			         * PetscPowReal(aY[j][i].u,5.0);
+
 
               vxx = (vil - 2.0 * aY[j][i].v + vir)/(hr)*htheta;
               vyy = (vjl - 2.0 * aY[j][i].v + vjr)/(x*x*htheta)*hr;
-              v1 = - 2.0/x*1.0/(2.0)*(vir - vil)*htheta
-                        - 3.0/(x*x)*1.0/PetscTanReal(y)*1.0/(2.0)*(vjr - vjl)*hr;
+              v1 = 4.0/x*1.0/(2.0)*(vir - vil)*htheta
+                        + 3.0/(x*x)*1.0/PetscTanReal(y)*1.0/(2.0)*(vjr - vjl)*hr;
               v2 = dNdr(x,y,a,M)*1.0/(2.0)*(vir - vil)*htheta
                         + dNdtheta(x,y,a,M)*1.0/(2.0*x*x)*(vjr - vjl)*hr;
               v3 = - 6.0/(aY[j][i].u)*1.0/(2.0)*(uir - uil)
-                                *1.0/(2.0*hr)*(vir - vil)*htheta
+                        *1.0/(2.0*hr)*(vir - vil)*htheta
                    - 6.0/(aY[j][i].u)*1.0/(2.0*x*x)*(ujr - ujl)
-                                *1.0/(2.0*htheta)*(vjr - vjl)*hr;
-	      aG[j][i].u = ((uxx + uyy) + u1 + u2 + u3);
-              aG[j][i].v = ((vxx + vyy) + v1 + v2 + v3);
+                        *1.0/(2.0*htheta)*(vjr - vjl)*hr;
+	          
+              aG[j][i].u = ((uxx + uyy) + u1 + u2 + u3);
+              aG[j][i].v = ((vxx + vyy) + v1 - v2 - v3);
+          //    PetscPrintf(PETSC_COMM_WORLD, "NN=%g\n",NN(x,y,a,M));
           }
       }
     }
