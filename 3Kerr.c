@@ -488,12 +488,7 @@ PetscErrorCode InitialState(DM da, Vec Y, AppCtx* user) {
                 aY[j][i].v = Omega_exact(x, y, a, M);
              }
              else{
-                aY[j][i].u = // barrier_rup(x, y, rhori + coer*hx, coer*hx)
-                               //         *psi_exact(x,y,a,M) 
-                             1.0 + 1.40434*barrier(x, y, rhori);
-                             //+ 0.01*(1.0 - barrier(x,y,rhori));
-                            //2.0*(1.0 - barrier(x,y,rhori-0.001*hx)) 
-                            //+ 2.00434*barrier(x,y,rhori-0.001*hx);
+                aY[j][i].u = 1.0 + 1.00434*barrier(x, y, rhori);
 		        aY[j][i].v = Omega_exact(x,y,a,M)*(1.0 - barrier(x,y,rhori))
                              - 0.00835427*barrier(x,y,rhori);
 
@@ -528,7 +523,7 @@ PetscErrorCode ExactSolution(DM da, Vec Y, AppCtx* user) {
       for (i = info.xs; i < info.xs+info.xm; i++) {
           x = hx * i + user->L;
           aY[j][i].u = psi_exact(x, y, a, M)*(1.0 - barrier(x, y, rhori)) 
-                            + 2.30434*barrier(x, y, rhori);
+                            + 2.00434*barrier(x, y, rhori);
           aY[j][i].v = Omega_exact(x, y, a, M)*(1.0 - barrier(x, y, rhori)) 
                             - 0.00835427*barrier(x, y, rhori);
       }
@@ -603,12 +598,13 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
 	  if (barrier_rup1 > 0.6) { 
           aG[j][i].u = aY[j][i].u - psi_exact(x, y, a, M); 
 	      aG[j][i].v = aY[j][i].v - Omega_exact(x, y, a, M);
-	 //	  theta = PetscAtanReal(y/(x - 0.001));
-	 //     ierr = indexfunc_up(info, theta, rhori + 5.0*coer*hx,
-	 //		       rhori + 3.0*coer*hx, value, aY, user); CHKERRQ(ierr);
-	 //     part = - 3.0*aY[j][i].u + 4.0*value[1] - value[0];
-	 //     aG[j][i].u = part/(4.0*coer*hx) + aY[j][i].u/(2.0*rhori);
-	   }
+	   	  theta = PetscAtanReal(y/(x - 0.001));
+	      ierr = indexfunc_up(info, theta, rhori + 5.0*coer*hx,
+	   	            rhori + 3.0*coer*hx, value, aY, user); CHKERRQ(ierr);
+	      part = value[0] - aY[j][i].u;//(- 3.0*aY[j][i].u + 4.0*value[1] - value[0]);
+	      aG[j][i].u = part/(3.5*coer*hx) + aY[j][i].u/(2.0*rhori);
+      //    PetscPrintf(PETSC_COMM_WORLD, "part=%g\n", part);
+       }
        else if (i==mx-1||j==0||j==my-1){
            aG[j][i].u = aY[j][i].u - psi_exact(x, y, a, M);
            aG[j][i].v = aY[j][i].v - Omega_exact(x, y, a, M);
@@ -621,32 +617,31 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
            vxl = (i==0) ? aY[j][i+1].v : aY[j][i-1].v;
            vxr = (i==mx-1) ? aY[j][i-1].v : aY[j][i+1].v;
            vyl = (j==0) ? aY[j+1][i].v : aY[j-1][i].v;
-              vyr = (j==my-1) ? aY[j-1][i].v : aY[j+1][i].v;
+           vyr = (j==my-1) ? aY[j-1][i].v : aY[j+1][i].v;
 
-              uxx = (uxl - 2.0 * aY[j][i].u + uxr)/(hx)*hy;
-              uyy = (uyl - 2.0 * aY[j][i].u + uyr)/(hy)*hx;
-              u1 = (aY[j][i+1].u - uxl) / (2.0*x)*hy;
-              u2 = 1.0/4.0*qro2z2(x,y,a,M)*aY[j][i].u*hx*hy;
-              u3 = 1.0/16.0*PetscPowReal(NN(x,y,a,M), - 2.0)*x*x
+           uxx = (uxl - 2.0 * aY[j][i].u + uxr)/(hx)*hy;
+           uyy = (uyl - 2.0 * aY[j][i].u + uyr)/(hy)*hx;
+           u1 = (aY[j][i+1].u - uxl) / (2.0*x)*hy;
+           u2 = 1.0/4.0*qro2z2(x,y,a,M)*aY[j][i].u*hx*hy;
+           u3 = 1.0/16.0*PetscPowReal(NN(x,y,a,M), - 2.0)*x*x
                 * (PetscPowReal(1.0/(2.0)*(aY[j][i+1].v - vxl),2.0)*hy/hx
                     + PetscPowReal(1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v),2.0)*hx/hy)
                 * PetscPowReal(aY[j][i].u, 5.0);
 
-              vxx = (vxl - 2.0 * aY[j][i].v + vxr)/(hx)*hy;
-              vyy = (vyl - 2.0 * aY[j][i].v + vyr)/(hy)*hx;
-              v1 = 3.0/x*1.0/(2.0)*(aY[j][i+1].v - vxl)*hy;
-              v2 = - dNdro(x,y,a,M)*1.0/(2.0)*(aY[j][i+1].v - vxl)*hy
-                        - dNdz(x,y,a,M)*1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v)*hx;
-              v3 =  6.0/(aY[j][i].u)*1.0/(2.0)*(aY[j][i+1].u - uxl)
-                                *1.0/(2.0)*(aY[j][i+1].v - vxl)*hy/hx
-                   + 6.0/(aY[j][i].u)*1.0/(2.0)*(aY[j+1][i].u - aY[j-1][i].u)
-                                *1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v)*hx/hy;
+           vxx = (vxl - 2.0 * aY[j][i].v + vxr)/(hx)*hy;
+           vyy = (vyl - 2.0 * aY[j][i].v + vyr)/(hy)*hx;
+           v1 = 3.0/x*1.0/(2.0)*(aY[j][i+1].v - vxl)*hy;
+           v2 = - dNdro(x,y,a,M)*1.0/(2.0)*(aY[j][i+1].v - vxl)*hy
+                - dNdz(x,y,a,M)*1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v)*hx;
+           v3 =  6.0/(aY[j][i].u)*1.0/(2.0)*(aY[j][i+1].u - uxl)
+                        *1.0/(2.0)*(aY[j][i+1].v - vxl)*hy/hx
+                + 6.0/(aY[j][i].u)*1.0/(2.0)*(aY[j+1][i].u - aY[j-1][i].u)
+                        *1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v)*hx/hy;
 	          
-              aG[j][i].u = (uxx + uyy + u1 + u2 + u3)*(1.0 - barrier(x, y, rhori))
-                                + 0.0*barrier(x, y, rhori);
-              aG[j][i].v = 0.0*(vxx + vyy + v1 + v2 + v3)*(1.0 - barrier(x, y, rhori))
-                                + 0.0*barrier(x, y, rhori);
-	 
+           aG[j][i].u = (uxx + uyy + u1 + u2 + u3)*(1.0 - barrier(x, y, rhori))
+                            + 0.0*barrier(x, y, rhori);
+           aG[j][i].v = 0.0*(vxx + vyy + v1 + v2 + v3)*(1.0 - barrier(x, y, rhori))
+                            + 0.0*barrier(x, y, rhori);
        } 
     }
   }
