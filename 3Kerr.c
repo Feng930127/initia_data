@@ -49,25 +49,23 @@ static PetscReal q_func(PetscReal x, PetscReal y,
   Delta = Delta_fun(x,y,a,M);
   Sigma = rtuta*rtuta + a*a*costhe2;
   AA    = PetscPowReal(a*a+rtuta*rtuta,2.0) - a*a*Delta*sinthe2;
-  ans  = 1./2.*PetscLogReal(Sigma*Sigma/AA);
+  ans =  PetscPowReal(AA/(r*r*Sigma),1.0/4.0);
   
   if(PetscAbsReal(ans) < EPSILON) return(0.);
   else return(ans);
 }
-
 static PetscReal CC_fun(PetscReal x, PetscReal y,
-                        PetscReal a, PetscReal M) {
-  PetscReal CC, r;
-  
-  r = PetscSqrtReal(x*x + y*y);
-  CC = (1.0 - (M*M - a*a)/(4.0*r*r));
+                         PetscReal a, PetscReal M) {
+   PetscReal CC, r;
+   
+   r = PetscSqrtReal(x*x + y*y);
+   CC = (1.0 - (M*M - a*a)/(4.0*r*r));
 
   if(PetscAbsReal(CC) < EPSILON) return(0.);
   else return(CC);
-}
-
+ }
 static PetscReal psi_exact(PetscReal x, PetscReal y,
-                                PetscReal a, PetscReal M){
+                                  PetscReal a, PetscReal M){
   PetscReal rtuta, sinthe, costhe, sinthe2, ans,
             costhe2, Delta, Sigma, AA, r, the;
 
@@ -321,8 +319,8 @@ static PetscReal barrier(PetscReal x, PetscReal y,
                             PetscReal rhori) {
   PetscReal barrier, A, r1;
   
-  A = PetscPowReal(10.0,25.0);
-  r1 = PetscSqrtReal((x - 0.001)*(x - 0.001) + (y)*(y)) - (rhori);
+  A = PetscPowReal(10.0,22.0);
+  r1 = PetscSqrtReal((x - 0.0001)*(x - 0.0001) + (y)*(y)) - (rhori);
   barrier = - 1.0/PETSC_PI*PetscAtanReal(r1*A) + 1.0/2;
   if(PetscAbsReal(barrier) < 0.1) return(0.);
   else return(barrier);
@@ -332,10 +330,10 @@ static PetscReal barrier_rup(PetscReal x, PetscReal y,
 			   PetscReal r0, PetscReal epsilon) {
   PetscReal barrier_rup, A, r1, r2;
 
-  A = PetscPowReal(10.0, 25.0);
-  r1 = PetscSqrtReal((x - 0.001)*(x - 0.001) + (y)*(y)) 
+  A = PetscPowReal(10.0, 22.0);
+  r1 = PetscSqrtReal((x - 0.0001)*(x - 0.0001) + (y)*(y)) 
 		- (r0 - epsilon);
-  r2 = PetscSqrtReal((x - 0.001)*(x - 0.001) + (y)*(y)) 
+  r2 = PetscSqrtReal((x - 0.0001)*(x - 0.0001) + (y)*(y)) 
 		- (r0 + epsilon);
   barrier_rup = 1.0/PETSC_PI*(PetscAtanReal(A*r1)
 		- PetscAtanReal(A*r2)); 
@@ -347,9 +345,9 @@ static PetscReal barrier_thetaup(PetscReal x, PetscReal y,
 			       PetscReal theta0, PetscReal epsilon) {
   PetscReal barrier_thetaup, a, theta1, theta2;
   
-  a = PetscPowReal(10.0, 25.0);
-  theta1 = PetscAtanReal((y)/(x-0.001)) - (theta0 - epsilon);
-  theta2 = PetscAtanReal((y)/(x-0.001)) - (theta0 + epsilon);
+  a = PetscPowReal(10.0, 22.0);
+  theta1 = PetscAtanReal((y)/(x-0.0001)) - (theta0 - epsilon);
+  theta2 = PetscAtanReal((y)/(x-0.0001)) - (theta0 + epsilon);
   barrier_thetaup = 1.0/PETSC_PI*(PetscAtanReal(a*theta1)
                 - PetscAtanReal(a*theta2));
   
@@ -363,6 +361,7 @@ extern PetscErrorCode InitialState(DM, Vec, AppCtx*);
 extern PetscErrorCode ExactSolution(DM, Vec, AppCtx*);
 extern PetscErrorCode FormFunctionLocal(DMDALocalInfo*, Field**, Field**, AppCtx*);
 extern PetscErrorCode FormJacobianLocal(DMDALocalInfo*, Field**, Mat, Mat, AppCtx*);
+extern PetscErrorCode err_func(DMDALocalInfo*, DM, Vec, Vec, AppCtx*);
 //------------------------------------------------------------------------
 
 
@@ -372,7 +371,7 @@ int main(int argc,char **argv) {
   DM            da;
   SNES          snes;
   AppCtx        user;
-  Vec           x, Yexact, err, err1, y;
+  Vec           x, Yexact, err, y;
   Mat           M1;
   PetscReal     hx, hy, errnorm, errnorm1, errnorm2;
   DMDALocalInfo info;
@@ -380,7 +379,7 @@ int main(int argc,char **argv) {
   ierr = PetscInitialize(&argc,&argv,NULL,help); if (ierr) return ierr;
   user.a  = 0.3;
   user.M  = 3.0;
-  user.L  = 0.001;
+  user.L  = 0.0001;
   user.R  = 20.0;
   user.U  = 10.0;
   user.D  = -10.0; 
@@ -426,7 +425,6 @@ int main(int argc,char **argv) {
   ierr = DMCreateGlobalVector(da,&x); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&Yexact); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&err); CHKERRQ(ierr);
-  ierr = VecDuplicate(x,&err1); CHKERRQ(ierr);
   ierr = VecDuplicate(x,&y); CHKERRQ(ierr);
   ierr = InitialState(da,x,&user); CHKERRQ(ierr);
   ierr = ExactSolution(da,Yexact,&user); CHKERRQ(ierr);
@@ -442,11 +440,11 @@ int main(int argc,char **argv) {
   
   ierr = SNESSolve(snes,NULL,x); CHKERRQ(ierr);
   ierr = SNESComputeFunction(snes, x, y); CHKERRQ(ierr);
- 
+  ierr = err_func(&info, da, x, Yexact, &user); CHKERRQ(ierr); 
+
   hx = (user.R - user.L) / (PetscReal)(info.mx - 1);
   hy = (user.U - user.D) / (PetscReal)(info.my - 1);
   ierr = VecWAXPY(err,-1.0,x,Yexact); CHKERRQ(ierr);
-  ierr = VecWAXPY(err1,-1.0,x,Yexact); CHKERRQ(ierr);
   ierr = VecNorm(err, NORM_INFINITY, &errnorm); CHKERRQ(ierr);
   ierr = VecNorm(err, NORM_1, &errnorm1); CHKERRQ(ierr);
 
@@ -456,7 +454,7 @@ int main(int argc,char **argv) {
            "L-Inf(err)=%g, L1(err)=%g, L-Inf(res)=%g\n", errnorm,errnorm1*hx*hy,errnorm2/hx/hy); CHKERRQ(ierr);
 
   VecDestroy(&x);    VecDestroy(&Yexact); 
-  VecDestroy(&err);   VecDestroy(&err1);
+  VecDestroy(&err);  
   SNESDestroy(&snes);    DMDestroy(&da);
   return PetscFinalize();
 }
@@ -551,11 +549,11 @@ PetscErrorCode indexfunc_up(DMDALocalInfo *info, PetscReal theta,
                         *barrier_thetaup(x, y, theta, coethe*hx);
  	      barrier2 = barrier_rup(x, y, r2, coer*hx)
                         *barrier_thetaup(x, y, theta, coethe*hx);
-	  if (barrier1 > 0.9) {
+	  if (barrier1 > 0.8) {
                 value[0] = aY[j][i].u;
 		k = k + 1;
           }
-	  else if (barrier2 > 0.9) {
+	  else if (barrier2 > 0.8) {
 		value[1] = aY[j][i].u;
 		l = l + 1;
 	  }
@@ -577,7 +575,7 @@ PetscErrorCode indexfunc_up(DMDALocalInfo *info, PetscReal theta,
 PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY, 
 				Field **aG, AppCtx *user) {
   PetscErrorCode ierr;
-  PetscInt   i, j, mx = info->mx, my = info->my, n, k;
+  PetscInt   i, j, mx = info->mx, my = info->my;
   PetscReal  value[2], uxx, uyy, u1, u2, u3, vxx, vyy, v1, v2, v3, x, y;
   PetscReal  hx = (user->R - user->L) / (PetscReal)(mx - 1),
              hy = (user->U - user->D) / (PetscReal)(my - 1),
@@ -585,27 +583,42 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
              uxl, uxr, uyl, uyr, theta, barrier_rup1,
              barrier_thetaup1, part, coer = user->coer,
              rhori = user->rhori;
+  //for (j = info->ys; j < info->ys + info->ym; j++) {
+  //    y = hy * j + user->D;
+  //    for (i = info->xs; i < info->xs + info->xm; i++) {
+	//  x = hx * i + user->L; theta = 0.0;
+//	  barrier_rup1 = barrier_rup(x, y, rhori - 1.0*coer*hx, coer*hx);
+ // 	  if (barrier_rup1 > 0.5) { 
+  //        theta = PetscAtanReal(y/(x - 0.0001));
+//		  ierr = indexfunc_up(info, theta, rhori + 3.0*coer*hx,
+//				 rhori + 1.0*coer*hx, value, aY, user); CHKERRQ(ierr);
+//		  part = value[1]/(2.0*(rhori + 1.0*coer*hx));
+//		  aY[j][i].u = (4.0*value[1] - value[0] + 4.0*coer*hx*part)/3.0;
+//          break;
+//	   }
+//     }
+//  }
 
   for (j = info->ys; j < info->ys + info->ym; j++) {
       y = hy * j + user->D;
       for (i = info->xs; i < info->xs + info->xm; i++) {
-	  x = hx * i + user->L; theta = 0.0;
-	  barrier_rup1 = barrier_rup(x, y, rhori + coer*hx, coer*hx);
+	  x = hx * i + user->L;
+	  barrier_rup1 = barrier_rup(x, y, rhori - 0.0*coer*hx, coer*hx);
       //if (i==0){
       //     aG[j][i].u = -3.0*aY[j][i].u + 4.0*aY[j][i+1].u -aY[j][i+2].u;
       //     aG[j][i].v = -3.0*aY[j][i].v + 4.0*aY[j][i+1].v -aY[j][i+2].v;
       //}
+      
 	  if (barrier_rup1 > 0.6) { 
-          aG[j][i].u = aY[j][i].u - psi_exact(x, y, a, M); 
 	      aG[j][i].v = aY[j][i].v - Omega_exact(x, y, a, M);
-	   	  theta = PetscAtanReal(y/(x - 0.001));
-	      ierr = indexfunc_up(info, theta, rhori + 5.0*coer*hx,
-	   	            rhori + 3.0*coer*hx, value, aY, user); CHKERRQ(ierr);
-	      part = value[0] - aY[j][i].u;//(- 3.0*aY[j][i].u + 4.0*value[1] - value[0]);
-	      aG[j][i].u = part/(3.5*coer*hx) + aY[j][i].u/(2.0*rhori);
-      //    PetscPrintf(PETSC_COMM_WORLD, "part=%g\n", part);
+	   	  theta = PetscAtanReal(y/(x - 0.0001));
+	      ierr = indexfunc_up(info, theta, rhori + 4.0*coer*hx,
+	   	            rhori + 2.0*coer*hx, value, aY, user); CHKERRQ(ierr);
+	      part = -3.0*aY[j][i].u + 4.0*value[1] - value[0];
+	      aG[j][i].u = part/(4.0*coer*hx) + aY[j][i].u/2.0/(rhori);
+          //aG[j][i].u = aY[j][i].u - psi_exact(x, y, a, M);
        }
-       else if (i==mx-1||j==0||j==my-1){
+       else if (i==mx-1||j==0||j==my-1&barrier_rup1<=0.6){
            aG[j][i].u = aY[j][i].u - psi_exact(x, y, a, M);
            aG[j][i].v = aY[j][i].v - Omega_exact(x, y, a, M);
        }
@@ -623,7 +636,7 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
            uyy = (uyl - 2.0 * aY[j][i].u + uyr)/(hy)*hx;
            u1 = (aY[j][i+1].u - uxl) / (2.0*x)*hy;
            u2 = 1.0/4.0*qro2z2(x,y,a,M)*aY[j][i].u*hx*hy;
-           u3 = 1.0/16.0*PetscPowReal(NN(x,y,a,M), - 2.0)*x*x
+           u3 = 1.0/16.0*PetscPowReal(NN(x,y,a,M), -2.0)*x*x
                 * (PetscPowReal(1.0/(2.0)*(aY[j][i+1].v - vxl),2.0)*hy/hx
                     + PetscPowReal(1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v),2.0)*hx/hy)
                 * PetscPowReal(aY[j][i].u, 5.0);
@@ -648,3 +661,39 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
 	
     return 0;
 }
+
+
+PetscErrorCode err_func(DMDALocalInfo *info, DM da, Vec Y, 
+                    Vec Yexact, AppCtx *user) {
+  
+  PetscErrorCode   ierr;
+  PetscInt         i, j;
+  PetscReal        x, y, hx, hy, a = user->a, M = user->M, 
+                   err2 = 0.0, err1 = 0.0, mx = info->mx, 
+                   my = info->my, rhori = user->rhori;
+  DMDACoor2d       **aC;
+  Field            **aY, **aYexact;
+
+  ierr = DMDAGetCoordinateArray(da,&aC); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(da,Y,&aY); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(da, Yexact, &aYexact); CHKERRQ(ierr);
+  hx = (user->R - user->L) / (PetscReal)(mx - 1);
+  hy = (user->U - user->D) / (PetscReal)(my - 1);
+ 
+  for (j = info->ys; j < info->ys + info->ym; j++) {
+      y = hy * j + user->D;
+      for (i = info->xs; i < info->xs + info->xm; i++) {
+	      x = hx * i + user->L;  
+          err1 = err1 + PetscAbsReal(aY[j][i].u - aYexact[j][i].u)
+                            * (1.0 - barrier(x, y, rhori))*hx*hy;
+          err2 = err2 + PetscAbsReal(aY[j][i].v - aYexact[j][i].v)
+                            * (1.0 - barrier(x, y, rhori))*hx*hy;
+      }
+  }
+  ierr = PetscPrintf(PETSC_COMM_WORLD, "err1=%g\n", err1); CHKERRQ(ierr);
+  ierr = DMDAVecRestoreArray(da,Y,&aY); CHKERRQ(ierr);
+  ierr = DMDARestoreCoordinateArray(da,&aC); CHKERRQ(ierr);
+  return 0;
+ 
+}
+
