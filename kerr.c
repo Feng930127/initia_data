@@ -322,7 +322,7 @@ static PetscReal barrier(PetscReal x, PetscReal y,
   PetscReal barrier, A, r1;
   
   A = PetscPowReal(10.0,20.0);
-  r1 = PetscSqrtReal((x - 0.0001)*(x - 0.0001) + (y)*(y)) - (rhori);
+  r1 = PetscSqrtReal((x - 0.001)*(x - 0.001) + (y)*(y)) - (rhori);
   barrier = - 1.0/PETSC_PI*PetscAtanReal(r1*A) + 1.0/2;
   if(PetscAbsReal(barrier) < 0.1) return(0.);
   else return(barrier);
@@ -333,9 +333,9 @@ static PetscReal barrier_rup(PetscReal x, PetscReal y,
   PetscReal barrier_rup, A, r1, r2;
 
   A = PetscPowReal(10.0, 20.0);
-  r1 = PetscSqrtReal((x - 0.0001)*(x - 0.0001) + (y)*(y)) 
+  r1 = PetscSqrtReal((x - 0.001)*(x - 0.001) + (y)*(y)) 
 		- (r0 - epsilon);
-  r2 = PetscSqrtReal((x - 0.0001)*(x - 0.0001) + (y)*(y)) 
+  r2 = PetscSqrtReal((x - 0.001)*(x - 0.001) + (y)*(y)) 
 		- (r0 + epsilon);
   barrier_rup = 1.0/PETSC_PI*(PetscAtanReal(A*r1)
 		- PetscAtanReal(A*r2)); 
@@ -348,8 +348,8 @@ static PetscReal barrier_thetaup(PetscReal x, PetscReal y,
   PetscReal barrier_thetaup, a, theta1, theta2;
   
   a = PetscPowReal(10.0, 20.0);
-  theta1 = PetscAtanReal((y)/(x-0.0001)) - (theta0 - epsilon);
-  theta2 = PetscAtanReal((y)/(x-0.0001)) - (theta0 + epsilon);
+  theta1 = PetscAtanReal((y)/(x-0.001)) - (theta0 - epsilon);
+  theta2 = PetscAtanReal((y)/(x-0.001)) - (theta0 + epsilon);
   barrier_thetaup = 1.0/PETSC_PI*(PetscAtanReal(a*theta1)
                 - PetscAtanReal(a*theta2));
   
@@ -364,6 +364,9 @@ extern PetscErrorCode ExactSolution(DM, Vec, AppCtx*);
 extern PetscErrorCode FormFunctionLocal(DMDALocalInfo*, Field**, Field**, AppCtx*);
 extern PetscErrorCode FormJacobianLocal(DMDALocalInfo*, Field**, Mat, Mat, AppCtx*);
 //------------------------------------------------------------------------
+extern PetscErrorCode AngMom_ADMMass(DMDALocalInfo*, DM, Vec, PetscReal, AppCtx*);
+
+
 
 
 //STARTMAIN
@@ -374,20 +377,20 @@ int main(int argc,char **argv) {
   AppCtx        user;
   Vec           x, Yexact, err, err1, y;
   Mat           M1;
-  PetscReal     hx, hy, errnorm, errnorm1, errnorm2;
+  PetscReal     AngMom = 0.0, hx, hy, errnorm, errnorm1, errnorm2;
   DMDALocalInfo info;
 
   ierr = PetscInitialize(&argc,&argv,NULL,help); if (ierr) return ierr;
-  user.a  = 0.3;
+  user.a  = 0.2;
   user.M  = 3.0;
   user.L  = 0.0001;
-  user.R  = 20.0;
-  user.U  = 10.0;
-  user.D  = -10.0; 
+  user.R  = 200.0;
+  user.U  = 100.0;
+  user.D  = -100.0; 
   user.coer = 0.50;
   user.coethe = 0.50; 
   user.rhori = PetscSqrtReal(user.M*user.M - user.a*user.a)/2.0;
- 
+/* 
   ierr = PetscOptionsBegin(PETSC_COMM_WORLD, "Kerr_",
                                 "options for Kerr", ""); CHKERRQ(ierr);
   ierr = PetscOptionsReal("-a","The spin of the black hole",
@@ -403,7 +406,7 @@ int main(int argc,char **argv) {
   ierr = PetscOptionsReal("-D","The down side of the domain",
            "jacobian_neumann_constraints_kerr_Psi.c",user.D,&user.D,NULL);CHKERRQ(ierr);
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);
-
+*/
   ierr = DMDACreate2d(PETSC_COMM_WORLD,
                DM_BOUNDARY_NONE, DM_BOUNDARY_NONE,
                DMDA_STENCIL_STAR,  // for 5-point stencil
@@ -442,7 +445,9 @@ int main(int argc,char **argv) {
   
   ierr = SNESSolve(snes,NULL,x); CHKERRQ(ierr);
   ierr = SNESComputeFunction(snes, x, y); CHKERRQ(ierr);
+  ierr = AngMom_ADMMass(&info, da, Yexact, AngMom, &user);
  
+
   hx = (user.R - user.L) / (PetscReal)(info.mx - 1);
   hy = (user.U - user.D) / (PetscReal)(info.my - 1);
   ierr = VecWAXPY(err,-1.0,x,Yexact); CHKERRQ(ierr);
@@ -468,7 +473,7 @@ PetscErrorCode InitialState(DM da, Vec Y, AppCtx* user) {
   DMDALocalInfo    info;
   PetscInt         i,j;
   PetscReal        hx, hy, x, y, a = user->a, M = user->M,
-                   rhori = user->rhori;
+                   rhori = user->rhori, coer = user->coer;
   DMDACoor2d       **aC;
   Field            **aY;
 
@@ -488,14 +493,13 @@ PetscErrorCode InitialState(DM da, Vec Y, AppCtx* user) {
                 aY[j][i].v = Omega_exact(x, y, a, M);
              }
              else{
-                aY[j][i].u = psi_exact(x, y, a, M)*(1.0 - barrier(x,y,rhori-0.1*hx)) 
-                            + 2.00434*barrier(x,y,rhori-0.1*hx);
-		        aY[j][i].v = Omega_exact(x, y, a, M)*(1.0 - barrier(x,y,rhori))
-                             - 0.00835427*barrier(x,y,rhori);
-
-             }
+                aY[j][i].u = psi_exact(x, y, a, M)*(1.0 - barrier(x,y,rhori)) 
+                            + 2.00434*barrier(x,y,rhori);
+          aY[j][i].v = Omega_exact(x,y,a,M)*(1.0 - barrier(x,y,rhori)) 
+                            - 0.00835427*barrier(x,y,rhori);
       }
   }
+}
   ierr = DMDAVecRestoreArray(da,Y,&aY); CHKERRQ(ierr);
   ierr = DMDARestoreCoordinateArray(da,&aC); CHKERRQ(ierr);
   return 0;
@@ -523,9 +527,9 @@ PetscErrorCode ExactSolution(DM da, Vec Y, AppCtx* user) {
       y = hy * j + user->D;
       for (i = info.xs; i < info.xs+info.xm; i++) {
           x = hx * i + user->L;
-          aY[j][i].u = psi_exact(x, y, a, M)*(1.0 - barrier(x,y,rhori-0.1*hx)) 
-                            + 2.00434*barrier(x,y,rhori-0.1*hx);
-          aY[j][i].v = Omega_exact(x, y, a, M)*(1.0 - barrier(x,y,rhori)) 
+          aY[j][i].u = psi_exact(x, y, a, M)*(1.0 - barrier(x,y,rhori)) 
+                            + 2.00434*barrier(x,y,rhori);
+          aY[j][i].v = Omega_exact(x,y,a,M)*(1.0 - barrier(x,y,rhori)) 
                             - 0.00835427*barrier(x,y,rhori);
       }
   }
@@ -554,11 +558,12 @@ PetscErrorCode indexfunc_up(DMDALocalInfo *info, PetscReal theta,
                         *barrier_thetaup(x, y, theta, coethe*hx);
 	  if (barrier1 > 0.9) {
                 value[0] = aY[j][i].u;
+ 		value[2] = aY[j][i].v;
 		k = k + 1;
           }
 	  else if (barrier2 > 0.9) {
 		value[1] = aY[j][i].u;
-        value[2] = aY[j][i].v;
+ 		value[3] = aY[j][i].v;
 		l = l + 1;
 	  }
 	  else if (k == 1 && l == 1) {
@@ -580,14 +585,14 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
 				Field **aG, AppCtx *user) {
   PetscErrorCode ierr;
   PetscInt   i, j, mx = info->mx, my = info->my, n, k;
-  PetscReal  value[3],uxx, uyy, u1, u2, u3, vxx, vyy, v1, v2, v3, x, y;
+  PetscReal  value[4],uxx, uyy, u1, u2, u3, vxx, vyy, v1, v2, v3, x, y;
   PetscReal  hx = (user->R - user->L) / (PetscReal)(mx - 1),
              hy = (user->U - user->D) / (PetscReal)(my - 1),
              a = user->a, M = user->M, vxl, vxr, vyl, vyr,
              uxl, uxr, uyl, uyr, theta, barrier_rup1,
              barrier_thetaup1, part, coer = user->coer,
              rhori = user->rhori;
-
+/*
   for (j = info->ys; j < info->ys + info->ym; j++) {
       y = hy * j + user->D;
       for (i = info->xs; i < info->xs + info->xm; i++) {
@@ -596,22 +601,21 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
 	  if (barrier_rup1 > 0.9) { 
 	    n = (PetscInt)(PETSC_PI/(coer*hx));
 	    for (k = 0; k < n + 1; k++) {
-	   	  theta = (1.0 * k)*coer*hx - PETSC_PI/2.0;
+	   	  theta = (1.0 * k)*1.0*coer*hx - PETSC_PI/2.0;
 	  	  barrier_thetaup1 = barrier_thetaup(x, y, theta, coer*hx);
 		  if (barrier_thetaup1 > 0.6) {
 		      ierr = indexfunc_up(info, theta, rhori + 3.0*coer*hx,
 				 rhori + coer*hx, value, aY, user); CHKERRQ(ierr);
-		      part = 1.0/(value[1]*PetscExpReal(q_func(x,y,a,M))*rhori);
-              aY[j][i].v = value[2];
-		      aY[j][i].u = aY[j][i].u;//value[0] + 3.0/3.0*coer*hx*part*(x*dqdrho(x,y,a,M)
-				//+ (y)*dqdz(x,y,a,M) + 3.0);
+		      part = value[1]/(2.0*rhori);
+           //   aY[j][i].v = value[2];
+		      aY[j][i].u = psi_exact(x,y,a,M);//value[0] + 4.0*coer*hx*part;
 		      break;
  	  	   }
 	       }
 	   }
       }
   }
-	
+*/	
   for (j = info->ys; j < info->ys + info->ym; j++) {
       y = hy * j + user->D;
       for (i = info->xs; i < info->xs + info->xm; i++) {
@@ -637,7 +641,7 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
               u3 = 1.0/16.0*PetscPowReal(NN(x,y,a,M), - 2.0)*x*x
                 * (PetscPowReal(1.0/(2.0)*(aY[j][i+1].v - vxl),2.0)*hy/hx
                     + PetscPowReal(1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v),2.0)*hx/hy)
-                * PetscPowReal(aY[j][i].u,5.0);
+                * PetscPowReal(aY[j][i].u, 5.0);
 
               vxx = (vxl - 2.0 * aY[j][i].v + vxr)/(hx)*hy;
               vyy = (vyl - 2.0 * aY[j][i].v + vyr)/(hy)*hx;
@@ -649,13 +653,95 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY,
                    + 6.0/(aY[j][i].u)*1.0/(2.0)*(aY[j+1][i].u - aY[j-1][i].u)
                                 *1.0/(2.0)*(aY[j+1][i].v - aY[j-1][i].v)*hx/hy;
 	          
-              aG[j][i].u = (uxx + uyy + u1 + u2 + u3)*(1.0 - barrier(x, y, rhori-0.1*hx))
-                                + 0.0*barrier(x, y, rhori-0.1*hx);
-              aG[j][i].v = 0.0*(vxx + vyy + v1 + v2 + v3)*(1.0 - barrier(x, y, rhori))
-                                + 0.0*barrier(x, y,rhori);
+              aG[j][i].u = 0.0;//(uxx + uyy + u1 + u2 + 0.0*u3)*(1.0-barrier(x, y, rhori))
+                               // + 0.0*barrier(x, y, rhori);
+              aG[j][i].v = 0.0;//0.0*(vxx + vyy + v1 + v2 + v3)*(1.0-barrier(x, y, rhori-0.0001*hx))
+                               // + 0.0*barrier(x, y,rhori-0.0001*hx);
 	 
           }
       }
     }
     return 0;
 }
+
+
+PetscErrorCode AngMom_ADMMass(DMDALocalInfo *info, DM da, Vec Y, 
+                                PetscReal AngMom, AppCtx *user) {
+  PetscErrorCode   ierr;
+  PetscInt         i, j, n, k = 0;
+  PetscReal        x, y, hx, hy, dOmega, barrier_rup1,
+                   barrier_thetaup1,theta = 0.0,
+                   coer = user->coer, value[4],Mass=0.0,
+                   a = user->a, barrier_thetadown1,Masstotal,Angtotal,
+		   M = user->M,rhori = user->rhori,mx = info->mx, my = info->my;
+
+  DMDACoor2d       **aC;
+  Field            **aY;
+MPI_Comm         com;
+
+  ierr = DMDAGetCoordinateArray(da,&aC); CHKERRQ(ierr);
+  ierr = DMDAVecGetArray(da,Y,&aY); CHKERRQ(ierr);
+  hx = (user->R - user->L) / (PetscReal)(info->mx - 1);
+  hy = (user->U - user->D) / (PetscReal)(info->my - 1);
+/* 
+  n = (PetscInt)(PETSC_PI/(2.0*coer*hx));
+  while (k < n) {
+      theta = (k + 1)*2.0*coer*hx - PETSC_PI/2.0;
+      for (j = info->ys; j < info->ys + info->ym; j++) {
+          y = hy * j + user->D;
+          for (i = info->xs; i < info->xs + info->xm; i++) {
+	          x = hx * i + user->L;
+	          barrier_rup1 = barrier_rup(x, y, rhori + coer*hx, coer*hx)
+                                *barrier_thetaup(x, y, theta, coer*hx);
+              if (barrier_rup1 > 0.6) {
+                  ierr = indexfunc_up(info, theta, rhori + 5.0*coer*hx,
+				        rhori + 3.0*coer*hx, value, aY, user); CHKERRQ(ierr);
+                  dOmega = (value[3] - aY[j][i].v)/(2.0*coer*hx);
+                  //AngMom = AngMom + PetscAbsReal(PetscSinReal(theta))
+                  //          *2.0*coer*hx; 
+                  AngMom = AngMom + 1.0/8.0*2.0*coer*hx*rhori*rhori
+                              * PetscPowReal(PetscAbsReal(PetscSinReal(theta)),3.0)
+                              * PetscPowReal(aY[j][i].u, 8.0)
+                              * PetscExpReal(q_func(x,y,a,M))*rhori*rhori;
+               //   PetscPrintf(PETSC_COMM_WORLD,
+                //"AngMom=%g, dOmega=%g,theta=%g\n", AngMom, dOmega, theta); CHKERRQ(ierr);
+                goto here;
+               }
+           }    
+       }
+       here:
+       k = k + 1;
+  }
+*/     
+  for (j = info->ys; j < info->ys + info->ym; j++) {
+          y = hy * j + user->D;
+          for (i = info->xs; i < info->xs + info->xm; i++) {
+	          x = hx * i + user->L;
+             if (i == mx - 1){
+                   Mass = Mass + x*(aY[j][i].u - aY[j][i-1].u)/hx*hy;
+                   AngMom = AngMom + 1./8/NN(x,y,a,M)*PetscPowReal(aY[j][i].u, 4.0)*x*x*x*(aY[j][i].v-aY[j][i-1].v)/hx*hy;
+               }
+               if (j == 0){
+                   Mass = Mass + x*(aY[j][i].u - aY[j+1][i].u)/hy*hx;
+                   AngMom = AngMom + 1./8/NN(x,y,a,M)*PetscPowReal(aY[j][i].u, 4.0)*x*x*x*(aY[j][i].v-aY[j+1][i].v)/hy*hx;
+               }
+               if (j == my - 1){
+                   Mass = Mass + x*(aY[j][i].u - aY[j-1][i].u)/hy*hx;
+                   AngMom = AngMom + 1./8/NN(x,y,a,M)*PetscPowReal(aY[j][i].u, 4.0)*x*x*x*(aY[j][i].v-aY[j-1][i].v)/hy*hx;
+               }
+ 
+          }
+  }
+PetscObjectGetComm((PetscObject)(da),&com);
+   MPI_Allreduce(&Mass, &Masstotal, 1, MPIU_REAL, MPIU_SUM, com);
+   MPI_Allreduce(&AngMom, &Angtotal, 1, MPIU_REAL, MPIU_SUM, com);
+   PetscPrintf(PETSC_COMM_WORLD,
+            "Mass = %g, Angtotal = %g\n", -Masstotal, Angtotal); CHKERRQ(ierr);
+
+
+  ierr = DMDAVecRestoreArray(da,Y,&aY); CHKERRQ(ierr);
+  ierr = DMDARestoreCoordinateArray(da,&aC); CHKERRQ(ierr);
+  return 0;
+}
+
+
