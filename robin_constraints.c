@@ -169,7 +169,7 @@ int main(int argc,char **argv) {
   SNES          snes;
   AppCtx        user;
   Vec           x, Yexact, err, err1, y;
-  PetscReal     AngMom = 0.0, hx,hy, errnorm, errnorm1, errnorm2;
+  PetscReal     Mass = 0.0, hx,hy, errnorm, errnorm1, errnorm2;
   DMDALocalInfo info;
   Field   **aY;
   PetscInt i,j;
@@ -224,7 +224,7 @@ int main(int argc,char **argv) {
   ierr = DMDAVecGetArray(da,x,&aY); CHKERRQ(ierr);
 
   ierr = SNESComputeFunction(snes, x, y); CHKERRQ(ierr);
-  ierr = AngMom_ADMMass(&info, da, x, AngMom, &user);
+  ierr = AngMom_ADMMass(&info, da, x, Mass, &user);
  
   hx = (user.R - user.L) / (PetscReal)(info.mx - 1);
   hy = (user.U - user.D) / (PetscReal)(info.my - 1);
@@ -238,8 +238,8 @@ for (j = info.ys; j < info.ys+info.ym; j++) {
        }
    }
   ierr = PetscPrintf(PETSC_COMM_WORLD,
-           "L-Inf(res)=%g, L1(res)=%g, L-Inf(res)=%g,Angmom = \n", 
-                    errnorm,errnorm1*hx*hy,errnorm2, AngMom); CHKERRQ(ierr);
+           "L-Inf(res)=%g, L1(res)=%g, L-Inf(res)=%g,Mass = %g\n", 
+                    errnorm,errnorm1*hx*hy,errnorm2, Mass); CHKERRQ(ierr);
 
   VecDestroy(&x);    VecDestroy(&Yexact); 
   VecDestroy(&err);   VecDestroy(&err1);
@@ -468,23 +468,24 @@ PetscErrorCode FormFunctionLocal(DMDALocalInfo *info, Field **aY, Field **aG, Ap
 }
 
 PetscErrorCode AngMom_ADMMass(DMDALocalInfo *info, DM da, Vec Y, 
-                                PetscReal AngMom, AppCtx *user) {
+                                PetscReal Mass, AppCtx *user) {
   PetscErrorCode   ierr;
-  PetscInt         i, j, n, k = 0;
+  PetscInt         i,jj,jjmax,jjmim,iimax, j, n, k = 0;
   PetscReal        x, y, hx, hy, dOmega, barrier_rup1,
-                   barrier_thetaup1,theta = 0.0,Mass=0.0,
-                   coer = user->coer, value[4],
-                   mx = info->mx, my = info->my,
+                   barrier_thetaup1,theta = 0.0,AngMom=0.0,
+                   coer = user->coer, value[4],Mass1,
+                   mx = info->mx, my = info->my,Ang1,
                    a = user->a, sig1 = user->sig1,
                    sig2 = user->sig2,barrier_thetadown1;
   DMDACoor2d       **aC;
   Field            **aY;
+  MPI_Comm         com;  
 
   ierr = DMDAGetCoordinateArray(da,&aC); CHKERRQ(ierr);
   ierr = DMDAVecGetArray(da,Y,&aY); CHKERRQ(ierr);
   hx = (user->R - user->L) / (PetscReal)(info->mx - 1);
   hy = (user->U - user->D) / (PetscReal)(info->my - 1);
- 
+/* 
   n = (PetscInt)(PETSC_PI/(2.0*coer*hx));
   while (k < n) {
       theta = (k + 1)*2.0*coer*hx - PETSC_PI/2.0;
@@ -513,25 +514,80 @@ PetscErrorCode AngMom_ADMMass(DMDALocalInfo *info, DM da, Vec Y,
        }
        here:
        k = k + 1;
-  }      
-  for (j = info->ys; j < info->ys + info->ym; j++) {
+  }*/
+  jjmax = (PetscInt)((my - 1)/2 - 1.5/hy + 2);
+  iimax = (PetscInt)(1.5/hx + 2);
+  jjmim = (PetscInt)((my - 1)/2 - 4.5/hy - 2);
+ /* for (j = jjmim; j < jjmax + 1; j++) {
           y = hy * j + user->D;
+          for (i = info->xs; i < iimax + 1; i++) {
+               x = hx * i + user->L;
+               if (i == iimax){
+		   PetscPrintf(PETSC_COMM_WORLD, "j=%d,i=%d, jjmax = %d,jjmim=%d\n",j,i, jjmax,jjmim);
+                   PetscPrintf(PETSC_COMM_WORLD, "aY = %g\n",aY[j][i].u);
+		   Mass = Mass + x;*(aY[j][i].u - aY[j][i-1].u)/hx*hy;
+                   AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v - aY[j][i-1].v)/hx*hy;
+               }
+               if (j == jjmim){
+                   Mass = Mass + x*(aY[j][i].u - aY[j+1][i].u)/hy*hx;
+                   AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v - aY[j+1][i].v)/hy*hx;
+               }
+               if (j == jjmax){
+                   Mass = Mass + x*(aY[j][i].u - aY[j-1][i].u)/hy*hx;
+                   AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v - aY[j-1][i].v)/hy*hx;
+               }
+
+          }
+  }*/
+/*      
+  for (j = info->ys; j < info->ys + info->ym; j += 2) {
+          jj = (PetscInt)(j/2);
+          y = hy * jj + user->D;
           for (i = info->xs; i < info->xs + info->xm; i++) {
 	          x = hx * i + user->L;
              if (i == mx - 1){
-                   Mass = Mass + (aY[j][i].u - aY[j][i-1].u)/hx*hy;
+                   Mass = Mass + x*(aY[j][i].u - aY[j][i-1].u)/hx*hy;
+                   AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v-aY[j][i-1].v)/hx*hy;
                }
                if (j == 0){
-                   Mass = Mass + (aY[j][i].u - aY[j+1][i].u)/hy*hx;
+                   Mass = Mass + x*(aY[j][i].u - aY[j+1][i].u)/hy*hx;
+                   AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v-aY[j+1][i].v)/hy*hx;
                }
                if (j == my - 1){
-                   Mass = Mass + (aY[j][i].u - aY[j-1][i].u)/hy*hx;
+                   Mass = Mass + x*(aY[j][i].u - aY[j-1][i].u)/hy*hx;
+                   AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v-aY[j-1][i].v)/hy*hx;
                }
  
           }
   }
+*/
+
+ for (j = info->ys; j < info->ys + info->ym; j++) {
+          y = hy * j + user->D;
+          for (i = info->xs; i < info->xs + info->xm; i++) {
+	        x = hx * i + user->L;
+		if(i == iimax && (j >= jjmim || j <= jjmax)){
+			//PetscPrintf(PETSC_COMM_WORLD, "aY=%g\n", aY[j][i].u);
+                	AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v-aY[j][i-1].v)/hx*hy;
+		}
+		if(j==jjmax && (i <= iimax)){
+			AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v-aY[j-1][i].v)/hy*hx;
+		}
+		if(j == jjmim && (i <= iimax)){
+			AngMom = AngMom + 1./8*PetscPowReal(aY[j][i].u, -2.0)*x*x*x*(aY[j][i].v-aY[j-1][i].v)/hy*hx;
+		}	
+		else {
+			AngMom = AngMom + 0.0;
+		}
+          }
+ 
+  }
+  
+  PetscObjectGetComm((PetscObject)(da),&com);
+  MPI_Allreduce(&Mass, &Mass1, 1, MPIU_REAL, MPIU_SUM, com);
+  MPI_Allreduce(&AngMom, &Ang1, 1, MPIU_REAL, MPIU_SUM, com);
   PetscPrintf(PETSC_COMM_WORLD,
-           "AngMom=%g,Mass=%g\n", AngMom, Mass); CHKERRQ(ierr);
+           "Mass = %g, Angtotal = %g\n", Mass1,AngMom); CHKERRQ(ierr);
 
   ierr = DMDAVecRestoreArray(da,Y,&aY); CHKERRQ(ierr);
   ierr = DMDARestoreCoordinateArray(da,&aC); CHKERRQ(ierr);
