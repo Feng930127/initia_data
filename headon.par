@@ -1,0 +1,659 @@
+#=============================================================================
+# HeadOn.par 
+#==============================================================================
+
+#------------------------------------------------------------------------------
+# Cactus parameters:
+#------------------------------------------------------------------------------
+Cactus::cctk_run_title = "HeadOnML"
+Cactus::cctk_full_warnings         = "no"
+
+Cactus::terminate		= "never"
+#Cactus::terminate       = "time"
+#Cactus::cctk_final_time = 1500.0
+#Cactus::terminate = "iteration"
+#Cactus::cctk_itlast        =  0
+#Cactus::cctk_itlast        = 256 
+#Cactus::terminate="runtime"
+#Cactus::max_runtime=18
+#Cactus::max_runtime=55  #  55min
+#
+TerminationTrigger::max_walltime          = 72    # hours
+TerminationTrigger::on_remaining_walltime = 10.0   # minutes
+#TerminationTrigger::termination_from_file   = "yes"
+#TerminationTrigger::create_termination_file = "yes"
+#TerminationTrigger::termination_file        = "../TERMINATE"
+
+
+#------------------------------------------------------------------------------
+# Activate all necessary thorns:
+#------------------------------------------------------------------------------
+
+ActiveThorns = "Boundary CartGrid3D CoordBase Fortran InitBase IOUtil LocalReduce SymBase Time"
+ActiveThorns = "AEILocalInterp LocalInterp"
+ActiveThorns = "MoL Slab SpaceMask SphericalSurface"
+#ActiveThorns = "MoL ReflectionSymmetry RotatingSymmetry180 Slab SpaceMask SphericalSurface"
+#ActiveThorns = "MoL Slab SpaceMask SphericalSurface"
+#ActiveThorns = "Carpet CarpetInterp CarpetIOASCII CarpetIOHDF5 CarpetIOScalar CarpetLib CarpetIOBasic CarpetReduce CarpetRegrid2 CarpetSlab CarpetTracker CarpetMask LoopControl SystemTopology"
+ActiveThorns = "Carpet CarpetInterp CarpetIOASCII CarpetIOHDF5 CarpetIOScalar CarpetLib CarpetIOBasic CarpetReduce CarpetRegrid2 CarpetSlab CarpetTracker LoopControl SystemTopology"
+ActiveThorns = "Formaline NaNChecker TerminationTrigger TimerReport"
+ActiveThorns = "ADMbase ADMcoupling ADMmacros CoordGauge StaticConformal"
+ActiveThorns = "PunctureTracker"
+ActiveThorns = "TmunuBase"
+ActiveThorns = "QuasiLocalMeasures"
+#ActiveThorns = "ADMConstraints"
+#ActiveThorns = "BLAS LAPACK GSL HDF5"
+#ActiveThorns = "TwoPunctures"
+ActiveThorns = "Meudon_Bin_BH"
+ActiveThorns = "SummationByParts"
+ActiveThorns = "GenericFD NewRad"
+ActiveThorns = "ML_BSSN ML_BSSN_Helper ML_ADMConstraints"
+ActiveThorns = "Dissipation"
+ActiveThorns = "AHFinderDirect"
+ActiveThorns = "WeylScal4 Multipole"
+ActiveThorns = "SystemStatistics"
+ActiveThorns = "Coordinates"
+ActiveThorns = "GlobalDerivative"
+
+
+#------------------------------------------------------------------------------
+# Diagnostic parameters:
+#------------------------------------------------------------------------------
+AHFinderDirect::verbose_level = "physics details"
+#AHFinderDirect::verbose_level = "algorithm debug"
+
+Carpet::output_timers_every = 0
+Carpet::storage_verbose   = "no"
+Carpet::verbose           = "no"
+#Carpet::veryverbose       = "yes"
+Carpet::grid_structure_filename = "carpet-grid-structure"
+Carpet::grid_coordinates_filename = "carpet-grid-coordinates"
+
+#CarpetLib::output_bboxes  = "no"
+#CarpetLib::print_memstats_every     = 1024
+#CarpetLib::print_timestats_every    = 1024
+
+#CarpetMask::verbose = "yes"
+#CarpetReduce::verbose    = "yes"
+CarpetRegrid2::verbose    = "yes"
+#CarpetRegrid2::veryverbose    = "yes"
+
+CarpetTracker::verbose    = "yes"
+
+Dissipation::verbose = "no"
+
+#NaNChecker::verbose         = "all"
+NaNChecker::verbose         = "standard"
+
+TimerReport::out_every    = 2048
+#TimerReport::out_filename = "TimerReport"
+#TimerReport::output_all_timers = "yes"
+#TimerReport::output_all_timers_together = "yes"
+TimerReport::output_all_timers_readable = "yes"
+#TimerReport::before_checkpoint          = "yes"
+#TimerReport::n_top_timers = 40
+
+PunctureTracker::verbose   = "yes"
+QuasiLocalMeasures::verbose   = "yes"
+#QuasiLocalMeasures::veryverbose   = "yes"
+SphericalSurface::verbose   = "yes"
+
+#------------------------------------------------------------------------------
+# Utility parameters:
+#------------------------------------------------------------------------------
+
+#NaNChecker::check_every    = 1024
+NaNChecker::check_every   =  1
+NaNChecker::check_vars = "
+            ML_BSSN::ML_log_confac
+            ML_BSSN::ML_metric
+            ML_BSSN::ML_trace_curv
+            ML_BSSN::ML_curv
+            ML_BSSN::ML_Gamma
+            ML_BSSN::ML_lapse
+            ML_BSSN::ML_shift
+            ML_BSSN::ML_dtlapse
+            ML_BSSN::ML_dtshift
+            ADMBase::curv 
+            ADMBase::metric 
+            ADMBase::lapse 
+            ADMBase::shift 
+            ADMBase::dtlapse
+            ADMBase::dtshift
+"
+NaNChecker::action_if_found   =  "terminate"
+#NaNChecker::action_if_found  =  "abort"
+#NaNChecker::action_if_found = "just warn" #"terminate", "just warn", "abort"
+#NaNChecker::check_after=0
+
+
+#------------------------------------------------------------------------------
+# Run parameters:
+#------------------------------------------------------------------------------
+
+#------
+# Grid:
+#------
+
+Time::timestep_method = "given" 
+Time::timestep = 0.25 
+MoL::ODE_Method             = "rk4"
+MoL::MoL_Intermediate_Steps = 4
+MoL::MoL_Num_Scratch_Levels = 1
+
+#CartGrid3D::type            = "coordbase"
+#CartGrid3D::domain          = "full"
+#CartGrid3D::avoid_origin    = "no"
+
+#CoordBase::domainsize       = "minmax"
+#CoordBase::spacing          = "gridspacing"  # "gridspacing" or "numcells"
+#CoordBase::spacing          = "numcells"  # "gridspacing" or "numcells"
+
+# On a HPC (Total required memory: ~6.5GB):
+#CoordBase::xmin = -5.00
+#CoordBase::ymin = -5.00
+#CoordBase::zmin = -5.00
+#CoordBase::xmax =  5.00
+#CoordBase::ymax =  5.00
+#CoordBase::zmax =  5.00
+#CoordBase::ncells_x   =   100  # dx or ncells_x
+#CoordBase::ncells_y   =   100  # dy or ncells_y
+#CoordBase::ncells_z   =   100  # dz or ncells_z
+#
+#CoordBase::boundary_size_x_lower        = 3
+#CoordBase::boundary_size_y_lower        = 3
+#CoordBase::boundary_size_z_lower        = 3
+#CoordBase::boundary_size_x_upper        = 3
+#CoordBase::boundary_size_y_upper        = 3
+#CoordBase::boundary_size_z_upper        = 3
+#CoordBase::boundary_shiftout_x_lower    = 1
+#CoordBase::boundary_shiftout_y_lower    = 1 
+#CoordBase::boundary_shiftout_z_lower    = 1
+#CoordBase::boundary_shiftout_x_upper    = 1 
+#CoordBase::boundary_shiftout_y_upper    = 1 
+#CoordBase::boundary_shiftout_z_upper    = 1 
+
+Carpet::domain_from_multipatch          = yes                                                               
+CartGrid3D::type                        = "multipatch"                                                      
+CartGrid3D::set_coordinate_ranges_on    = "all maps"                                                        
+Coordinates::coordinate_system          = "Thornburg04"                                                     
+Coordinates::h_cartesian                = 1                                    
+Coordinates::h_radial                   = 1 
+                                                                                                            
+Coordinates::sphere_inner_radius        = 50                                              
+Coordinates::sphere_outer_radius        = 1000                                            
+Coordinates::n_angular                  = 28                                                                
+                                                                                                            
+Driver::ghost_size                      = 5                                                                 
+Coordinates::patch_boundary_size        = 5                                                                 
+Coordinates::additional_overlap_size    = 3                                                                 
+Coordinates::outer_boundary_size        = 5
+
+#Coordinates::symmetry                   = "+xyz octant"                                                            
+#Coordinates::symmetry                   = "+z bitant"                                                            
+Coordinates::symmetry                   = "full"                                                            
+#Coordinates::additional_symmetry_size   = 1                                                                      
+Coordinates::verbose                    = yes
+
+#ReflectionSymmetry::reflection_z = yes
+#ReflectionSymmetry::avoid_origin_z = "no"
+
+# General Carpet parameters:
+#Carpet::domain_from_coordbase = "yes"
+#Carpet::enable_all_storage    = "no"
+Carpet::use_buffer_zones      = "yes"
+#Carpet::schedule_barriers     = "no"
+
+#Carpet::poison_new_timelevels    = "yes"
+Carpet::poison_new_timelevels    = "no"
+Carpet::check_for_poison         = "no"
+#Carpet::poison_value             = 113 # git version only!
+
+#Carpet::init_3_timelevels        = "no"
+Carpet::init_fill_timelevels     = "yes"
+
+#CarpetLib::poison_new_memory = "yes"
+#CarpetLib::poison_value      = 114
+#CarpetLib::check_bboxes              = "no"
+#CarpetLib::interleave_communications = "yes"
+#CarpetLib::vary_tags                 = "yes" # git version only!
+#CarpetLib::combine_sends             = "yes"
+#CarpetLib::reduce_mpi_waitall        = "yes" # git version only!
+
+CarpetInterp::tree_search = "yes"
+CarpetInterp::check_tree_search = "no"
+
+#CarpetRegrid2::freeze_unaligned_levels = "yes"
+#CarpetRegrid2::snap_to_coarse          = "yes"
+#CarpetRegrid2::symmetry_rotating180    = "yes"
+
+# System specific Carpet parameters:
+#CarpetRegrid2::symmetry_rotating90    = "yes"
+Carpet::time_refinement_factors = "[1, 1, 2, 4, 8, 16, 32, 64, 128, 256]"
+Carpet::max_refinement_levels    = 9
+Carpet::prolongation_order_space = 5
+Carpet::prolongation_order_time  = 2
+
+CarpetRegrid2::regrid_every = 128
+CarpetRegrid2::num_centres  = 2
+
+CarpetRegrid2::active_1             = "yes" 
+CarpetRegrid2::num_levels_1         =  7 
+CarpetRegrid2::position_z_1         = +20
+CarpetRegrid2::radius_1             = [0, 40, 20, 10, 5, 2.5, 1.25]            
+#CarpetRegrid2::movement_threshold_1 =  0.16
+
+CarpetRegrid2::active_2             = "yes" 
+CarpetRegrid2::num_levels_2         =  7
+CarpetRegrid2::position_z_2         = -20
+CarpetRegrid2::radius_2             = [0, 40, 20, 10, 5, 2.5, 1.25]            
+#CarpetRegrid2::movement_threshold_2 =  0.16
+
+
+#CarpetMask::excluded_surface       [0] = 0
+#CarpetMask::excluded_surface_factor[0] = 1.0
+#CarpetMask::excluded_surface       [1] = 1
+#CarpetMask::excluded_surface_factor[1] = 1.0
+#CarpetMask::excluded_surface       [2] = 2
+#CarpetMask::excluded_surface_factor[2] = 1.0
+
+#------
+# MODEL:
+#------
+
+#Meudon_Bin_BH::filename          = "./par/headon/ml_40.00.dat"
+Meudon_Bin_BH::filename          = "./par/headon/static_10.00.dat"
+ADMBase::metric_type             = "physical"
+ADMBase::initial_data            = "ID_Bin_BH"
+ADMBase::initial_lapse           = "ID_Bin_BH"
+ADMBase::initial_shift           = "ID_Bin_BH"
+ADMBase::initial_dtlapse         = "none"
+ADMBase::initial_dtshift         = "none"
+# needed for AHFinderDirect:
+#ADMBase::metric_timelevels = 3
+
+#----------
+# Numerics:
+#----------
+
+#InitBase::initial_data_setup_method = "init_all_levels"
+InitBase::initial_data_setup_method = "init_single_level"
+
+ADMMacros::spatial_order = 4
+
+
+
+SummationByParts::order = 8
+
+SummationByParts::sbp_upwind_deriv = no
+
+SummationByParts::sbp_1st_deriv                      = yes
+SummationByParts::sbp_2nd_deriv                      = no
+SummationByParts::onesided_interpatch_boundaries     = no
+SummationByParts::onesided_outer_boundaries          = yes
+SummationByParts::use_dissipation                    = no
+GlobalDerivative::use_dissipation                    = yes
+SummationByParts::scale_with_h                       = yes
+SummationByParts::dissipation_type                   = "Kreiss-Oliger"
+SummationByParts::epsdis                             = 0.15
+
+# Because dt/dx is half that of the other levels we also need half the dissipation
+GlobalDerivative::epsdis_for_level               [0] = 0.075
+
+# Variables for dissipation
+SummationByParts::vars                               = "
+ML_BSSN::ML_log_confac
+ML_BSSN::ML_metric
+ML_BSSN::ML_trace_curv
+ML_BSSN::ML_curv
+ML_BSSN::ML_Gamma
+ML_BSSN::ML_lapse
+ML_BSSN::ML_shift
+ML_BSSN::ML_dtlapse
+ML_BSSN::ML_dtshift
+"
+
+
+SphericalSurface::nsurfaces = 5
+SphericalSurface::maxntheta = 39
+SphericalSurface::maxnphi   = 76
+
+SphericalSurface::ntheta      [0] = 39
+SphericalSurface::nphi        [0] = 76
+SphericalSurface::nghoststheta[0] = 2
+SphericalSurface::nghostsphi  [0] = 2
+
+SphericalSurface::ntheta      [1] = 39
+SphericalSurface::nphi        [1] = 76
+SphericalSurface::nghoststheta[1] = 2
+SphericalSurface::nghostsphi  [1] = 2
+
+SphericalSurface::ntheta      [2] = 39
+SphericalSurface::nphi        [2] = 76
+SphericalSurface::nghoststheta[2] = 2
+SphericalSurface::nghostsphi  [2] = 2
+
+SphericalSurface::ntheta      [3] = 39
+SphericalSurface::nphi        [3] = 76
+SphericalSurface::nghoststheta[3] = 2
+SphericalSurface::nghostsphi  [3] = 2
+
+SphericalSurface::ntheta      [4] = 39
+SphericalSurface::nphi        [4] = 76
+SphericalSurface::nghoststheta[4] = 2
+SphericalSurface::nghostsphi  [4] = 2
+
+
+#-----------
+# Evolution:
+#-----------
+#
+GenericFD::jacobian_group = "Coordinates::jacobian"
+GenericFD::jacobian_derivative_group = "Coordinates::jacobian2"
+GenericFD::jacobian_identity_map = 0
+
+
+ADMBase::evolution_method        = "ML_BSSN"
+ADMBase::lapse_evolution_method  = "ML_BSSN"
+ADMBase::shift_evolution_method  = "ML_BSSN"
+ADMBase::dtlapse_evolution_method= "ML_BSSN"
+ADMBase::dtshift_evolution_method= "ML_BSSN"
+
+
+#ML_BSSN::timelevels = 3
+ML_BSSN::fdOrder = 8
+
+ML_BSSN::harmonicN           = 1      # 1+log
+ML_BSSN::harmonicF           = 2.0    # 1+log
+ML_BSSN::ShiftGammaCoeff     = 0.75
+#ML_BSSN::AlphaDriver         = 1.0
+ML_BSSN::BetaDriver          = 1.0
+ML_BSSN::advectLapse         = 1.0
+ML_BSSN::advectShift         = 1.0
+
+ML_BSSN::MinimumLapse        = 1.0e-8
+ML_BSSN::epsDiss             = 0.0
+
+ML_BSSN::dt_lapse_shift_method = "noLapseShiftAdvection"
+
+ML_BSSN::initial_boundary_condition = "extrapolate-gammas"
+#ML_BSSN::rhs_boundary_condition     = "NewRad"
+ML_BSSN::rhs_boundary_condition     = "scalar"
+Boundary::radpower                     = 2
+
+#ML_BSSN::ML_log_confac_bound = "none"
+#ML_BSSN::ML_metric_bound     = "none"
+#ML_BSSN::ML_Gamma_bound      = "none"
+#ML_BSSN::ML_trace_curv_bound = "none"
+#ML_BSSN::ML_curv_bound       = "none"
+#ML_BSSN::ML_lapse_bound      = "none"
+#ML_BSSN::ML_dtlapse_bound    = "none"
+#ML_BSSN::ML_shift_bound      = "none"
+#ML_BSSN::ML_dtshift_bound    = "none"
+
+
+#------------------------------------------------------------------------------
+# Output:
+#------------------------------------------------------------------------------
+
+IO::out_dir = "./simulations/headonML"
+IO::out_fileinfo           = "none"
+
+IOBasic::outInfo_every = 1024
+IOBasic::outInfo_reductions = "minimum maximum"
+IOBasic::outInfo_vars  = "
+ Carpet::physical_time_per_hour
+ #SystemStatistics::maxrss_mb
+ #ML_ADMConstraints::ML_Ham
+ #ML_BSSN::ML_trace_curv
+"
+
+IOScalar::outScalar_every      = 1024
+IOScalar::one_file_per_group   = "yes"
+IOScalar::outScalar_reductions = "minimum maximum average norm1 norm2"
+IOScalar::outScalar_vars       = "
+ #ADMBase::lapse
+ #ADMBase::shift
+ #ADMBase::metric
+ #ADMBase::curv
+ #ADMBase::dtlapse
+ #ADMBase::dtshift
+ #ML_ADMConstraints::ML_Ham
+ #ML_ADMConstraints::ML_mom
+ #ML_BSSN::ML_Ham
+ #ML_BSSN::ML_mom
+ #SystemStatistics::process_memory_mb{out_every=4}
+ #SphericalSurface::sf_radius
+"
+
+IOASCII::one_file_per_group     = "yes"
+IOASCII::output_symmetry_points = "no"
+#IOASCII::output_ghost_points    = "no"  #hg version only!
+IOASCII::out3D_ghosts       = "no"
+#IOASCII::out3D_outer_ghosts = "no"
+ 
+
+IOASCII::out0D_every     = 1024
+IOASCII::out0D_vars      = "
+ #Carpet::timing
+ PunctureTracker::pt_loc
+ QuasiLocalMeasures::qlm_scalars{out_every = 1024}  
+ QuasiLocalMeasures::qlm_multipole_moments{out_every = 1024} 
+ #SphericalSurface::sf_active
+ #SphericalSurface::sf_valid
+ #SphericalSurface::sf_info
+ #SphericalSurface::sf_radius
+ #SphericalSurface::sf_origin
+ #SphericalSurface::sf_coordinate_descriptors
+"
+
+#Set these IOASCII options for initial data only:
+IOASCII::out1D_every     = 0
+IOASCII::out1D_d         = "no"
+IOASCII::out1D_vars      = "
+ #CarpetReduce::weight
+ ADMBase::lapse
+ ADMBase::metric
+ ADMBase::curv
+ ADMBase::shift
+ ML_BSSN::ML_Ham
+ ML_BSSN::ML_mom
+ ML_ADMConstraints::ML_Ham
+ ML_ADMConstraints::ML_mom
+"
+
+# To draw the AH circunference in the z=0 plane
+# set these IOASCII options (for evolution only):
+# NOTE: it is not possible yet to output array lines
+# as set below.
+#IOASCII::out1D_every     = 32
+#IOASCII::out1D_x         = "no"
+#IOASCII::out1D_z         = "no"
+#IOASCII::out1D_d         = "no"
+#IOASCII::out1D_yline_xi  = 19
+#IOASCII::out1D_yline_zi  =  0
+#IOASCII::out1D_vars      = "
+# SphericalSurface::sf_radius
+#"
+
+IOASCII::out2D_every     = 0
+IOASCII::out2D_xy        = "no"
+IOASCII::out2D_xz        = "no"
+IOASCII::out2D_yz        = "yes"
+IOASCII::out2D_vars      = "
+ ML_ADMConstraints::ML_Ham
+ #ML_ADMConstraints::ML_mom
+ SphericalSurface::sf_radius{out_every=1024}
+"
+# ADMBase::lapse
+# ADMBase::metric
+# ADMBase::curv
+# ML_BSSN::ML_Ham
+# ML_BSSN::ML_mom
+
+IOHDF5::one_file_per_group             = "yes"
+IOHDF5::open_one_input_file_at_a_time  = "yes"
+
+IOHDF5::out2D_every                    = 0
+IOHDF5::out2D_xy                       = "no"
+IOHDF5::out2D_xz                       = "no"
+IOHDF5::out2D_yz                       = "yes"
+IOHDF5::out2D_yzplane_x                = 0.0
+IOHDF5::out2D_vars      = "
+  #CarpetReduce::weight
+  #Grid::coordinates
+  #ADMBase::lapse
+  #ADMBase::metric
+  #ADMBase::curv
+  #ML_ADMConstraints::ML_Ham
+  #ML_ADMConstraints::ML_Mom
+  #WeylScal4::Psi4r
+  #WeylScal4::Psi4i
+ "
+
+
+#IOHDF5::out3D_ghosts       = "no"
+#IOHDF5::out3D_outer_ghosts = "no"
+
+#IOHDF5::out_every = 512000000
+IOHDF5::out_every = 1024
+IOHDF5::out_vars  = "
+ QuasiLocalMeasures::qlm_scalars{out_every = 1024}  
+ QuasiLocalMeasures::qlm_multipole_moments{out_every = 1024} 
+ #CarpetRduce::weight
+ #ADMBase::lapse
+ #ML_ADMConstraints::ML_Ham
+ #ML_ADMConstraints::ML_Mom
+"
+# Grid::coordinates
+# ADMBase::metric
+# ML_BSSN::ML_Ham
+# ML_BSSN::ML_mom
+
+#------------------------------------------------------------------------------
+# Analysis:
+#------------------------------------------------------------------------------
+
+AHFinderDirect::find_every                               = 256
+
+#AHFinderDirect::run_at_CCTK_ANALYSIS = "yes"
+#AHFinderDirect::run_at_CCTK_POSTSTEP = "no"
+AHFinderDirect::run_at_CCTK_POST_RECOVER_VARIABLES = "no"
+
+#AHFinderDirect::move_origins            = "no"
+AHFinderDirect::move_origins            = "yes"
+#AHFinderDirect::reshape_while_moving    = "yes"
+#AHFinderDirect::predict_origin_movement = "yes"
+
+# Hermite to order 3 to avoid discontinuities in the metric spatial derivatives:
+#AHFinderDirect::geometry_interpolator_name = "Hermite polynomial interpolation"
+#AHFinderDirect::geometry_interpolator_pars = "order=3"
+#AHFinderDirect::surface_interpolator_name  = "Hermite polynomial interpolation"
+#AHFinderDirect::surface_interpolator_pars  = "order=3"
+AHFinderDirect::geometry_interpolator_name = "Lagrange polynomial interpolation"
+AHFinderDirect::geometry_interpolator_pars = "order=4"
+AHFinderDirect::surface_interpolator_name  = "Lagrange polynomial interpolation"
+AHFinderDirect::surface_interpolator_pars  = "order=4"
+
+AHFinderDirect::output_h_every = 1024
+
+AHFinderDirect::N_horizons = 3
+
+AHFinderDirect::max_Newton_iterations__initial           = 50 
+AHFinderDirect::max_Newton_iterations__subsequent        = 50
+#AHFinderDirect::max_allowable_Theta_growth_iterations    = 10
+#AHFinderDirect::max_allowable_Theta_nonshrink_iterations = 10
+
+AHFinderDirect::origin_z                             [1] = +5
+AHFinderDirect::initial_guess__coord_sphere__z_center[1] = +5
+AHFinderDirect::initial_guess__coord_sphere__radius  [1] = 0.4
+AHFinderDirect::which_surface_to_store_info          [1] = 1
+AHFinderDirect::set_mask_for_individual_horizon      [1] = no
+AHFinderDirect::reset_horizon_after_not_finding      [1] = yes 
+AHFinderDirect::track_origin_from_grid_scalar        [1] = yes
+AHFinderDirect::track_origin_source_x                [1] = "PunctureTracker::pt_loc_x[0]"
+AHFinderDirect::track_origin_source_y                [1] = "PunctureTracker::pt_loc_y[0]"
+AHFinderDirect::track_origin_source_z                [1] = "PunctureTracker::pt_loc_z[0]"
+AHFinderDirect::max_allowable_horizon_radius         [1] = 1
+AHFinderDirect::N_zones_per_right_angle              [1] = 18
+
+
+AHFinderDirect::origin_z                             [2] = -5
+AHFinderDirect::initial_guess__coord_sphere__z_center[2] = -5
+AHFinderDirect::initial_guess__coord_sphere__radius  [2] = 0.4
+AHFinderDirect::which_surface_to_store_info          [2] = 2
+AHFinderDirect::set_mask_for_individual_horizon      [2] = no
+AHFinderDirect::reset_horizon_after_not_finding      [2] = yes
+AHFinderDirect::track_origin_from_grid_scalar        [2] = yes
+AHFinderDirect::track_origin_source_x                [2] = "PunctureTracker::pt_loc_x[1]"
+AHFinderDirect::track_origin_source_y                [2] = "PunctureTracker::pt_loc_y[1]"
+AHFinderDirect::track_origin_source_z                [2] = "PunctureTracker::pt_loc_z[1]"
+AHFinderDirect::max_allowable_horizon_radius         [2] = 1
+AHFinderDirect::N_zones_per_right_angle              [2] = 18
+
+AHFinderDirect::origin_z                             [3] = 0
+AHFinderDirect::find_after_individual_time           [3] = 22
+AHFinderDirect::initial_guess__coord_sphere__z_center[3] = 0
+AHFinderDirect::initial_guess__coord_sphere__radius  [3] = 2.2
+AHFinderDirect::which_surface_to_store_info          [3] = 0
+AHFinderDirect::reset_horizon_after_not_finding      [3] = yes
+AHFinderDirect::max_allowable_horizon_radius         [3] = 5.5
+AHFinderDirect::N_zones_per_right_angle              [3] = 18
+AHFinderDirect::use_pretracking                      [3] = "yes"
+
+AHFinderDirect::max_N_zones_per_right_angle            = 28
+
+
+CarpetTracker::surface[0] = 3
+PunctureTracker::track                      [0] = "yes"
+PunctureTracker::initial_z                  [0] = +5
+PunctureTracker::which_surface_to_store_info[0] = 3
+
+CarpetTracker::surface[1] = 4
+PunctureTracker::track                      [1] = "yes"
+PunctureTracker::initial_z                  [1] = -5
+PunctureTracker::which_surface_to_store_info[1] = 4
+
+QuasiLocalMeasures::num_surfaces   = 5
+QuasiLocalMeasures::spatial_order  = 4
+QuasiLocalMeasures::interpolator = "Lagrange polynomial interpolation"
+QuasiLocalMeasures::interpolator_options = "order=4"
+QuasiLocalMeasures::surface_index  [0] = 0
+
+QuasiLocalMeasures::surface_index  [1] = 1
+QuasiLocalMeasures::surface_index  [2] = 2 
+
+Multipole::nradii       = 4
+Multipole::radius[0]    = 25
+Multipole::radius[1]    = 50
+Multipole::radius[2]    = 100
+Multipole::radius[3]    = 200
+Multipole::ntheta       = 120
+Multipole::nphi         = 240
+Multipole::variables    = "WeylScal4::Psi4r{sw=-2 cmplx='WeylScal4::Psi4i' name='psi4'}"
+Multipole::out_every    = 256
+Multipole::l_max       = 8 
+Multipole::output_ascii = no
+Multipole::output_hdf5 = yes
+
+WeylScal4::fdOrder = 8
+WeylScal4::calc_scalars              = "psis"
+WeylScal4::calc_invariants           = "always"
+
+
+
+#------------------------------------------------------------------------------
+# Checkpoint/Recovery:
+#------------------------------------------------------------------------------
+IOHDF5::checkpoint                  = "no"
+IO::checkpoint_dir                  = "./simulations/headonML/recovery" 
+IO::checkpoint_ID                   = "no"
+#IO::checkpoint_every                = 6144
+IO::checkpoint_every_walltime_hours = 24.0
+IO::checkpoint_keep=1
+IO::checkpoint_on_terminate         = "yes"
+
+IO::recover     = "autoprobe"
+IO::recover_dir = "./simulations/headonML/recovery"
+
+
